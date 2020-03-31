@@ -16,12 +16,6 @@ def shape_to_np(shape, dtype="int"):
 	# return the list of (x, y)-coordinates
 	return coords
 
-# def rect_to_np(rects):
-# 	rect = []
-# 	for i in rects:
-# 		rect.append([int(i.left()),int(i.top()),int(i.right()),int(i.bottom())])
-# 	return rect
-
 def rect_to_np(rects):
 	rect = []
 	for i in rects:
@@ -67,49 +61,40 @@ def main():
 	detector = dlib.get_frontal_face_detector()
 	predictor = dlib.shape_predictor('./shape_predictor_68_face_landmarks.dat')
 	
-	cap = cv2.VideoCapture('./Data/TestSet_P2/Test1.mp4')
-	out = cv2.VideoWriter('Test1.mp4',cv2.VideoWriter_fourcc(*'MP4V'), 20.0, (854,480))
+	## TO Run on a video and Record
+	# cap = cv2.VideoCapture('./Data/TestSet_P2/Test3.mp4')
+	# out = cv2.VideoWriter('Test3.mp4',cv2.VideoWriter_fourcc(*'MP4V'), 20.0, (854,480))
 
-	img2 = cv2.imread("./Data/TestSet_P2/Rambo.jpg")
+	img2 = cv2.imread("./Data/2.jpg")
 	img2_gray = cv2.cvtColor(img2,cv2.COLOR_BGR2GRAY)
 	rects2 = detector(img2_gray,1)
 	pts2 = predictor(img2_gray,rects2[0])
 	rect2 = rect_to_np(rects2)
-	# print("Rectangle 2: ",rect2)
 	fp2 = shape_to_np(pts2)
 	
-	## Visualize Points on Face2
-	# for i in fp2:
-	# 	x,y = i.ravel()
-	# 	img2 = cv2.circle(img2,(x,y),2,(0,255,0),2)
 
-
+	## Comment the line if running on video
+	ret = True
 	while True:
-		ret,img1 = cap.read()
+
+		## Uncomment if running on Video
+		# ret,img1 = cap.read()
 		if ret==False:
 			cap.release()
 			cv2.destroyAllWindows()
 			break
-
-		# img1 = cv2.imread("./Data/obama.jpg")
+		
+		img1 = cv2.imread("./Data/1.jpg")
 		img1_gray = cv2.cvtColor(img1,cv2.COLOR_BGR2GRAY)
 		rects1 = detector(img1_gray,1)
-		# print("Rects1 :",rects1)
-		print("img1_gray shape",img1_gray.shape)
 		rect1 = rect_to_np(rects1)
-		print("Rectangle 1: ",rect1)
-
-		if rect1 ==[] :
-			continue
 		pts1 = predictor(img1_gray,rects1[0])
 		fp1 = shape_to_np(pts1)
-		print("Points 1:",fp1)
-		
-		## Visualize Points on Face1
-		# for i in fp1:
-		# 	x,y = i.ravel()
-		# 	img1 = cv2.circle(img1,(x,y),2,(0,255,0),2)
 
+		## Uncomment if running on video
+		# if rect1 ==[] :
+		# 	out.write(img1)
+		# 	continue
 
 		src = np.zeros_like(img1)
 		poisson_mask = np.zeros_like(img1_gray)
@@ -123,25 +108,17 @@ def main():
 		triangles1 = face_triangles(triangles1,fp1,hull)
 
 		for t in triangles1:
-			# print("Triangle",t)
 
 			pt1 = [t[0], t[1]]
 			pt2 = [t[2], t[3]]
 			pt3 = [t[4], t[5]]
-			# cv2.line(img1, tuple(pt1), tuple(pt2), (0, 0, 255), 1)
-			# cv2.line(img1, tuple(pt2), tuple(pt3), (0, 0, 255), 1)
-			# cv2.line(img1, tuple(pt1), tuple(pt3), (0, 0, 255), 1)
-
 			points = get_points_in_triangles(img1_gray,pt1,pt2,pt3)
 			one_c = np.expand_dims(np.ones(points.shape[0],dtype=np.int64),axis=1)
 			points = np.append(points,one_c,axis=1)
-			# print("Points :",points)
 			Bd = np.array([[t[0],t[2],t[4]],[t[1],t[3],t[5]],[1,1,1]],dtype=np.int64)
 			bary_pt1 = np.matmul(np.linalg.inv(Bd),points.transpose().astype(np.int64))
-			print("Points :",points.shape)
 			points = points[bary_pt1.min(axis=0)>=0,:]
 			bary_pt1 = bary_pt1[:,bary_pt1.min(axis=0)>=0]
-			print("Bary1 ",bary_pt1.shape)
 
 			tri_id1 = [point_to_id(pt1,fp1),point_to_id(pt2,fp1),point_to_id(pt3,fp1)]
 			pts2 =  np.array([fp2[tri_id1[0]],fp2[tri_id1[1]],fp2[tri_id1[2]]])
@@ -154,17 +131,18 @@ def main():
 
 
 			cv2.fillPoly(poisson_mask,[np.array([pt1,pt2,pt3])],255)
+			
 			# # Optimizable
 			for i in range(0,points.shape[0]):
 				src[points[i,1],points[i,0]] = img2[bary_pt2.transpose()[i,1],bary_pt2.transpose()[i,0]]
 
 		mixed_clone = cv2.seamlessClone(src,img1, poisson_mask, (int((2*face_rect1[0]+face_rect1[2])/2),int((2*face_rect1[1]+face_rect1[3])/2)), cv2.NORMAL_CLONE)
-		out.write(mixed_clone)
+		# out.write(mixed_clone)
 		cv2.imshow("Image1 :",img1)
-		# cv2.imshow("Image2 :",img2)
+		cv2.imshow("Image2 :",img2)
 		cv2.imshow("Fake :",mixed_clone)
-		cv2.waitKey(1)
-			
+		cv2.waitKey()
+		ret = False
 
 		# cv2.imshow("Triangulation1 :",img1)
 		# cv2.imshow("Triangulation2 :",mixed_clone)
